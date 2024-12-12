@@ -106,10 +106,13 @@ class FourBitAdder extends Module{
      * TODO: Define IO ports of a 4-bit ripple-carry-adder as presented in the lecture
      */
     val a, b = Input(UInt(4.W))
-    val sum, carry = Output(UInt(4.W))
+    val sum = Output(UInt(4.W))
+    val carry = Output(UInt(1.W))
     })
-    val tempsum = Wire(UInt(4.W))
-    val tempcarry = Wire(UInt(1.W))
+    val tempcarry1 = Wire(UInt(1.W))
+    val tempcarry2 = Wire(UInt(1.W))
+    val tempcarry3 = Wire(UInt(1.W))
+    val tempcarry4 = Wire(UInt(1.W))
 
 
   /* 
@@ -120,32 +123,33 @@ class FourBitAdder extends Module{
     val fulladder2 = Module(new FullAdder())
     val fulladder3 = Module(new FullAdder())
   // Half Adder for the LSB
+    halfadder.io.a := io.a(0)
     halfadder.io.b := io.b(0)
-    tempsum(0) := halfadder.io.s
-    tempcarry := halfadder.io.c
+    val tempsum1 = halfadder.io.s
+    tempcarry1 := halfadder.io.c
   // Full Adder for the second bit
     fulladder1.io.a := io.a(1)
     fulladder1.io.b := io.b(1)
-    fulladder1.io.c := tempcarry
-    tempsum(1) := fulladder1.io.sum
-    tempcarry := fulladder1.io.carry
+    fulladder1.io.c := tempcarry1
+    val tempsum2 = fulladder1.io.sum
+    tempcarry2 := fulladder1.io.carry
   // Full Adder for the third bit
     fulladder2.io.a := io.a(2)
     fulladder2.io.b := io.b(2)
-    fulladder2.io.c := tempcarry
-    tempsum(2) := fulladder2.io.sum
-    tempcarry := fulladder2.io.carry
+    fulladder2.io.c := tempcarry2
+    val tempsum3 = fulladder2.io.sum
+    tempcarry3 := fulladder2.io.carry
   // Full Adder for the MSB
     fulladder3.io.a := io.a(3)
     fulladder3.io.b := io.b(3)
-    fulladder3.io.c := tempcarry
-    tempsum(3) := fulladder3.io.sum
-    tempcarry := fulladder3.io.carry
+    fulladder3.io.c := tempcarry3
+    val tempsum4 = fulladder3.io.sum
+    tempcarry4 := fulladder3.io.carry
 
 
   /* 
    * TODO: Describe output behaviour based on the input values and the internal 
    */
-     io.carry  := tempcarry
-     io.sum  := tempsum
+     io.carry  := tempcarry4
+     io.sum  := Cat(tempsum4,tempsum3,tempsum2,tempsum1).asUInt
 }

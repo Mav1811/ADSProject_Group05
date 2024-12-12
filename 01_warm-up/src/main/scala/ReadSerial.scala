@@ -16,7 +16,7 @@ class ControllerModule extends Module {
   val io = IO(new Bundle {
     val rst = Input(UInt(1.W))         // reset signal
     val serial_bus = Input(UInt(1.W))  // bus input
-    val count_s = Input(UInt(3.W))     // Counter value
+    val count_s = Input(UInt(4.W))     // Counter value
     val ready = Output(UInt(1.W))      // valid signal for output ready
     val start = Output(UInt(1.W))      // counter trigger
   })
@@ -68,14 +68,14 @@ class Counter extends Module {
   val io = IO(new Bundle {
     val rst = Input(UInt(1.W))     // reset signal
     val start = Input(UInt(1.W))   // start signal to trigger counting
-    val count_s = Output(UInt(3.W)) // 3-bit counter output
+    val count_s = Output(UInt(4.W)) // 3-bit counter output
   })
 
   import CounterState._
 
   // Internal registers
   val state = RegInit(START_COUNT)  // Initial state is START_COUNT
-  val counter = RegInit(0.U(3.W))  // 3-bit counter, initialized to 0
+  val counter = RegInit(0.U(4.W))  // 3-bit counter, initialized to 0
 
   io.count_s := counter  // Output the counter value
 
@@ -92,7 +92,7 @@ class Counter extends Module {
 
     is(COUNT) {
       // Counting logic
-      when(counter === 7.U) {
+      when(counter === 8.U) {
         counter := 0.U  // Reset counter after reaching 7
         state := START_COUNT // Change the state
       }.otherwise {
@@ -137,12 +137,12 @@ class ReadSerial extends Module {
   })
 
   // Declare wires
-  val counter_value = Wire(UInt(3.W))
+  val counter_value = Wire(UInt(4.W))
   val counter_start = Wire(UInt(1.W))
 
   // Registers to avoid combinational loop
-  val counter_reg = RegInit(0.U(3.W)) // Register for counter_end
-  val counter_start_reg = RegInit(0.U(1.W)) // Register for counter_start
+  // val counter_reg = RegInit(0.U(3.W)) // Register for counter_end
+  // val counter_start_reg = RegInit(0.U(1.W)) // Register for counter_start
 
   // Instantiate modules
   val controller = Module(new ControllerModule())
@@ -153,8 +153,8 @@ class ReadSerial extends Module {
   io.data := 0.U
 
   // Update the registers with the wire values after each clock cycle
-  counter_reg := counter_value
-  counter_start_reg := counter_start
+  //counter_reg := counter_value
+  //counter_start_reg := counter_start
 
   // Controller connections
   controller.io.rst := io.reset_n
@@ -165,15 +165,15 @@ class ReadSerial extends Module {
 
   // Counter connections
   counter.io.rst := io.reset_n
-  counter.io.start := counter_start_reg
+  counter.io.start := counter_start
   counter_value := counter.io.count_s
 
   // Shift register connections
   shiftRegister.io.serial_bus := io.rxd
   io.data := shiftRegister.io.parallel_out
 
-  when(io.reset_n === 1.U) {
-    counter_reg := 0.U
-    counter_start_reg := 0.U
-  }
+  // when(io.reset_n === 1.U) {
+  //  counter_reg := 0.U
+  //  counter_start_reg := 0.U
+  //}
 }
