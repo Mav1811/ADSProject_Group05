@@ -72,35 +72,69 @@ class RV32Icore (BinaryFile: String) extends Module {
   /*
    * TODO: Implement the program counter as a register, initialize with zero
    */
+  val pc = RegInit(0.U(12.W))
 
   val regFile = Mem(32, UInt(32.W))
+  /*val regAdr_1 = Wire(UInt(5.W))
+  val regWriteEn = Wire(UInt(1.W))
+  val regAdr_2 = Wire(UInt(5.W))
+  val regA = RegInit(0.U(32.W))
+  val regB = RegInit(0.U(32.W))
+  val writeAddr = Wire(UInt(5.W))
+  val writeValue = Wire(UInt(5.W))
   /*
    * TODO: hard-wire register x0 to zero
-   */
+   */*/
+  regFile(0) := 0.U
 
   // -----------------------------------------
   // Fetch
   // -----------------------------------------
 
   val instr  = Wire(UInt(32.W)) 
-  instr := IMem(PC>>2.U)                     
+  instr := IMem(PC>>2.U)
 
   // -----------------------------------------
   // Decode
   // -----------------------------------------
 
   val opcode = instr(6, 0)
+  val funct3 = instr(14, 12)
+  val funct7 = instr(31, 25)
+  val funct3 = instr(14, 12)
+  val shifttype = instr(30)
+  val shamt = instr(24, 20)
+  val rd = instr(11, 7)
+
   /*
    * TODO: Add missing fields from fetched instructions for decoding
    */
 
   val isADD  = (opcode === "b0110011".U && funct3 === "b000".U && funct7 === "b0000000".U)
+  val isSUB  = (opcode === "b0110011".U && funct3 === "b000".U && funct7 === "b0100000".U)
+  val isAND  = (opcode === "b0110011".U && funct3 === "b111".U && funct7 === "b0000000".U)
+  val isOR   = (opcode === "b0110011".U && funct3 === "b110".U && funct7 === "b0000000".U)
+  val isXOR  = (opcode === "b0110011".U && funct3 === "b100".U && funct7 === "b0000000".U)
+  val isSLTU  = (opcode === "b0110011".U && funct3 === "b011".U && funct7 === "b0000000".U)
+  val isSLT  = (opcode === "b0110011".U && funct3 === "b010".U && funct7 === "b0000000".U)
+  val isSLL  = (opcode === "b0110011".U && funct3 === "b001".U && funct7 === "b0000000".U)
+  val isSRL  = (opcode === "b0110011".U && funct3 === "b101".U && funct7 === "b0000000".U)
+  val isSRA  = (opcode === "b0110011".U && funct3 === "b101".U && funct7 === "b0100000".U)
+
   /*
    * TODO: Add missing R-Type instructions here
    */
 
 
   val isADDI = (opcode === "b0010011".U && funct3 === "b000".U)
+  val isSLTI = (opcode === "b0010011".U && funct3 === "b010".U)
+  val isSLTIU = (opcode === "b0010011".U && funct3 === "b011".U)
+  val isANDI = (opcode === "b0010011".U && funct3 === "b111".U)
+  val isORI = (opcode === "b0010011".U && funct3 === "b110".U)
+  val isXORI = (opcode === "b0010011".U && funct3 === "b100".U)
+  val isSLLI = (opcode === "b0010011".U && funct3 === "b001".U)
+  val isSRLI = (opcode === "b0010011".U && funct3 === "b101".U && shifttype === "b0")
+  val isSRAI = (opcode === "b0010011".U && funct3 === "b001".U && shifttype === "b1")
 
 
   // Operands
@@ -108,6 +142,14 @@ class RV32Icore (BinaryFile: String) extends Module {
    /*
    * TODO: Add operand signals accoring to specification
    */
+  val operandA = regFile(instr(19, 15)).asSInt
+  val operandB = Wire(SInt(32.W))
+  when( opcode === "b0010011"){
+    val operandB = instr(31, 20).asSInt
+  }.elsewhen(opcode === "b0110011"){
+    val operandB = regFile(instr(24, 20)).asSInt
+  }
+
 
   // -----------------------------------------
   // Execute
@@ -115,12 +157,47 @@ class RV32Icore (BinaryFile: String) extends Module {
 
   val aluResult = Wire(UInt(32.W)) 
 
-  when(isADDI) { 
+  when(isADDI) { // start of I type
     aluResult := operandA + operandB 
-  }.elsewhen(isADD) {                           
+  }.elsewhen(isSLTI) {
+    aluResult := (operandA.asSInt < operandB).asUInt
+  }.elsewhen(isSLTIU) {
+    aluResult := (operandA.asUInt < operandB.asUInt).asUInt
+  }.elsewhen(isANDI) {
+    aluResult := operandA & operandB
+  }.elsewhen(isORI) {
+    aluResult := operandA | operandB
+  }.elsewhen(isXORI) {
+    aluResult := operandA ^ operandB
+  }.elsewhen(isSLLI) {
+    aluResult := operandA << shamt
+  }.elsewhen(isSRLI) {
+    aluResult := (operandA >> shamt).asUInt
+  }.elsewhen(isSRAI) {
+    aluResult := (operandA >> shamt).asSInt //end of I Type
+  }.elsewhen(isADD) { // start of R type
     aluResult := operandA + operandB 
+  }.elsewhen(isSUB) {
+    aluResult := operandA - operandB
+  }.elsewhen(isAND) {
+    aluResult := operandA & operandB
+  }.elsewhen(isOR) {
+    aluResult := operandA | operandB
+  }.elsewhen(isXOR) {
+    aluResult := operandA ^ operandB
+  }.elsewhen(isSLT) {
+    aluResult := (operandA.asSInt < operandB.asSInt).asUInt
+  }.elsewhen(isSLTU) {
+    aluResult := (operandA.asUInt < operandB.asUInt).asUInt
+  }.elsewhen(isSLL) {
+    aluResult := operandA << operandB(5, 0)
+  }.elsewhen(isSRL) {
+    aluResult := operandA >> operandB(5, 0)
+  }.elsewhen(isSRA) {
+    aluResult := (operandA >> operandB(5, 0)).asSInt // end of R type
+  }.otherwise(){
+    aluresult := "b0".U(32.W) // NOP
   }
-  /*
    * TODO: Add missing R-Type instructions here. Do not forget to implement a suitable default case for
    *       fetched instructions that are neither R-Type nor ADDI. 
    */
@@ -139,6 +216,7 @@ class RV32Icore (BinaryFile: String) extends Module {
 
   val writeBackData = Wire(UInt(32.W)) 
   writeBackData := aluResult
+    regFile(rd) := writeBackData
 
   /*
    * TODO: Store "writeBackData" in register "rd" in regFile
@@ -148,12 +226,12 @@ class RV32Icore (BinaryFile: String) extends Module {
   /*
    * TODO: Propagate "writeBackData" to the "check_res" output for testing purposes
    */
-  io.check_res := 0.U
+  io.check_res := writeBackData
 
   // Update PC
   // no jumps or branches, next PC always reads next address from IMEM
   /*
    * TODO: Increment PC
    */
-
+  pc = pc + "b000000000100"
 }

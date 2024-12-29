@@ -94,6 +94,52 @@ class ReadSerialTester extends AnyFlatSpec with ChiselScalatestTester {
       // output check
       dut.io.valid.expect(0.B)
 
+      //two transmissions
+      dut.io.reset_n.poke(0.U)
+      dut.io.rxd.poke(0.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U) // transmission started and 8 bits transmitted
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      dut.io.valid.expect(1.B)
+      dut.io.data.expect("b11111111".U)
+      dut.io.rxd.poke(0.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U) // transmission started and 8 bits transmitted
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      dut.io.rxd.poke(1.U)
+      dut.clock.step(1)
+      // output check
+      dut.io.valid.expect(1.B)
+      dut.io.data.expect("b11111111".U)
+      // output check
+
+
 
 
     }
