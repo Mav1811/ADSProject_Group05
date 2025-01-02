@@ -5,9 +5,9 @@
 // File created on 05/10/2023 by Tobias Jauch (@tojauch)
 
 /*
-The goal of this task is to implement a simple 32-bit RISC-V processor supporting parts of the RV32I instruction set architecture. This RV32I core is relatively basic 
-and does not include features like memory operations, exception handling, or branch instructions. It is designed for a simplified subset of the RISC-V ISA. It mainly 
-focuses on ALU operations and basic instruction execution. 
+The goal of this task is to implement a simple 32-bit RISC-V processor supporting parts of the RV32I instruction set architecture. This RV32I core is relatively basic
+and does not include features like memory operations, exception handling, or branch instructions. It is designed for a simplified subset of the RISC-V ISA. It mainly
+focuses on ALU operations and basic instruction execution.
 
     Instruction Memory:
         The code initializes an instruction memory "mem" with a capacity of 4096 32-bit words.
@@ -21,12 +21,12 @@ focuses on ALU operations and basic instruction execution.
         The Fetch Stage reads the current instruction from "mem" based on the value of the program counter PC.
 
     Decode Stage:
-        This stage extracts various fields (opcode, rd, funct3, rs1, funct7, and rs2) from the fetched instruction, according to the RISC-V ISA specification. 
-        The core determines the operands for ALU operations based on the instruction type and stores them into two variables "operandA" and "operandB". 
-        For R-Type instructions, both operands are read from regFile. For I-Type instructions, operandA is read from regFile, while operandB is an 
+        This stage extracts various fields (opcode, rd, funct3, rs1, funct7, and rs2) from the fetched instruction, according to the RISC-V ISA specification.
+        The core determines the operands for ALU operations based on the instruction type and stores them into two variables "operandA" and "operandB".
+        For R-Type instructions, both operands are read from regFile. For I-Type instructions, operandA is read from regFile, while operandB is an
         immediate value, encoded in the instruction.
 
-        The code defines a set of boolean signals (isADD, isADDI, etc.) to identify the type of instruction based on the opcode and function fields. These 
+        The code defines a set of boolean signals (isADD, isADDI, etc.) to identify the type of instruction based on the opcode and function fields. These
         signals are then used to determine the operation to be performed in the Execute Stage.
 
     Execute Stage:
@@ -91,8 +91,8 @@ class RV32Icore (BinaryFile: String) extends Module {
   // Fetch
   // -----------------------------------------
 
-  val instr  = Wire(UInt(32.W)) 
-  instr := IMem(PC>>2.U)
+  val instr  = Wire(UInt(32.W))
+  instr := IMem(pc>>2.U)
 
   // -----------------------------------------
   // Decode
@@ -101,7 +101,6 @@ class RV32Icore (BinaryFile: String) extends Module {
   val opcode = instr(6, 0)
   val funct3 = instr(14, 12)
   val funct7 = instr(31, 25)
-  val funct3 = instr(14, 12)
   val shifttype = instr(30)
   val shamt = instr(24, 20)
   val rd = instr(11, 7)
@@ -133,8 +132,8 @@ class RV32Icore (BinaryFile: String) extends Module {
   val isORI = (opcode === "b0010011".U && funct3 === "b110".U)
   val isXORI = (opcode === "b0010011".U && funct3 === "b100".U)
   val isSLLI = (opcode === "b0010011".U && funct3 === "b001".U)
-  val isSRLI = (opcode === "b0010011".U && funct3 === "b101".U && shifttype === "b0")
-  val isSRAI = (opcode === "b0010011".U && funct3 === "b001".U && shifttype === "b1")
+  val isSRLI = (opcode === "b0010011".U && funct3 === "b101".U && shifttype === "b0".U)
+  val isSRAI = (opcode === "b0010011".U && funct3 === "b001".U && shifttype === "b1".U)
 
 
   // Operands
@@ -144,9 +143,10 @@ class RV32Icore (BinaryFile: String) extends Module {
    */
   val operandA = regFile(instr(19, 15)).asSInt
   val operandB = Wire(SInt(32.W))
-  when( opcode === "b0010011"){
+  operandB := 0.S
+  when( opcode === "b0010011".U){
     val operandB = instr(31, 20).asSInt
-  }.elsewhen(opcode === "b0110011"){
+  }.elsewhen(opcode === "b0110011".U){
     val operandB = regFile(instr(24, 20)).asSInt
   }
 
@@ -155,14 +155,14 @@ class RV32Icore (BinaryFile: String) extends Module {
   // Execute
   // -----------------------------------------
 
-  val aluResult = Wire(UInt(32.W)) 
+  val aluResult = Wire(SInt(32.W))
 
   when(isADDI) { // start of I type
-    aluResult := operandA + operandB 
+    aluResult := operandA + operandB
   }.elsewhen(isSLTI) {
-    aluResult := (operandA.asSInt < operandB).asUInt
+    aluResult := (operandA  < operandB).asSInt
   }.elsewhen(isSLTIU) {
-    aluResult := (operandA.asUInt < operandB.asUInt).asUInt
+    aluResult := (operandA.asUInt < (operandB).asUInt).asSInt
   }.elsewhen(isANDI) {
     aluResult := operandA & operandB
   }.elsewhen(isORI) {
@@ -172,11 +172,11 @@ class RV32Icore (BinaryFile: String) extends Module {
   }.elsewhen(isSLLI) {
     aluResult := operandA << shamt
   }.elsewhen(isSRLI) {
-    aluResult := (operandA >> shamt).asUInt
+    aluResult := (operandA >> shamt)
   }.elsewhen(isSRAI) {
-    aluResult := (operandA >> shamt).asSInt //end of I Type
+    aluResult := (operandA >> shamt) //end of I Type
   }.elsewhen(isADD) { // start of R type
-    aluResult := operandA + operandB 
+    aluResult := operandA + operandB
   }.elsewhen(isSUB) {
     aluResult := operandA - operandB
   }.elsewhen(isAND) {
@@ -186,20 +186,21 @@ class RV32Icore (BinaryFile: String) extends Module {
   }.elsewhen(isXOR) {
     aluResult := operandA ^ operandB
   }.elsewhen(isSLT) {
-    aluResult := (operandA.asSInt < operandB.asSInt).asUInt
+    aluResult := (operandA < operandB).asSInt
   }.elsewhen(isSLTU) {
-    aluResult := (operandA.asUInt < operandB.asUInt).asUInt
+    aluResult := (operandA.asUInt < operandB.asUInt).asSInt
   }.elsewhen(isSLL) {
-    aluResult := operandA << operandB(5, 0)
+    aluResult := operandA << operandB(4, 0)
   }.elsewhen(isSRL) {
-    aluResult := operandA >> operandB(5, 0)
+    aluResult := (operandA.asUInt >> operandB(4, 0)).asSInt
   }.elsewhen(isSRA) {
-    aluResult := (operandA >> operandB(5, 0)).asSInt // end of R type
-  }.otherwise(){
-    aluresult := "b0".U(32.W) // NOP
+    aluResult := (operandA >> operandB(4, 0))// end of R type
+  }.otherwise{
+    aluResult := 0.S// NOP
+    dontTouch(pc)
   }
-   * TODO: Add missing R-Type instructions here. Do not forget to implement a suitable default case for
-   *       fetched instructions that are neither R-Type nor ADDI. 
+   /* TODO: Add missing R-Type instructions here. Do not forget to implement a suitable default
+   *       fetched instructions that are neither R-Type nor ADDI.
    */
 
 
@@ -211,12 +212,14 @@ class RV32Icore (BinaryFile: String) extends Module {
 
 
   // -----------------------------------------
-  // Write Back 
+  // Write Back
   // -----------------------------------------
 
-  val writeBackData = Wire(UInt(32.W)) 
-  writeBackData := aluResult
-    regFile(rd) := writeBackData
+  val writeBackData = Wire(UInt(32.W))
+  writeBackData := aluResult.asUInt
+  when(rd=/=0.U) {
+    regFile(rd) := writeBackData.asUInt
+  }
 
   /*
    * TODO: Store "writeBackData" in register "rd" in regFile
@@ -226,12 +229,12 @@ class RV32Icore (BinaryFile: String) extends Module {
   /*
    * TODO: Propagate "writeBackData" to the "check_res" output for testing purposes
    */
-  io.check_res := writeBackData
+  io.check_res := writeBackData.asUInt
 
   // Update PC
   // no jumps or branches, next PC always reads next address from IMEM
   /*
    * TODO: Increment PC
    */
-  pc = pc + "b000000000100"
+  pc := pc + 4.U
 }

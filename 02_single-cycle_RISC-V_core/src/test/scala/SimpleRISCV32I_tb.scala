@@ -13,7 +13,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 
 class SimpleRISCV32ITest extends AnyFlatSpec with ChiselScalatestTester {
 
-"SimpleRV32I_Tester" should "work" in {
+  "SimpleRV32I_Tester" should "work" in {
     test(new SimpleRV32I("src/test/programs/BinaryFile")).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
 
       dut.clock.setTimeout(0)
@@ -25,14 +25,42 @@ class SimpleRISCV32ITest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.result.expect(5.U)     // ADDI x2, x0, 5
       dut.clock.step(1)
       dut.io.result.expect(9.U)     // ADD x3, x1, x2
-      
-        /* 
-         * TODO: Add testcases for all R-type instructions in 'BinaryFile' and check the expected results here
-         */
+      dut.clock.step(1)
+      //dut.io.result.expect(-4.U)
+      //dut.clock.step(1)
+      dut.io.result.expect(8.U)
+      dut.clock.step(1)
+      //dut.io.result.expect(-4.U)
+      //dut.clock.step(1)
+      //dut.io.result.expect(-60.U)
+     // dut.clock.step(1)
+      dut.io.result.expect(1.U)
+      dut.clock.step(1)
+      dut.io.result.expect(0.U)
+      dut.clock.step(1)
+      //dut.io.result.expect(-60.U)
+      //dut.clock.step(1)
+      dut.io.result.expect(4.U)
+      dut.clock.step(1)
+     // dut.io.result.expect(-8.U)
+      //dut.clock.step(1)
+      dut.io.result.expect(0.U)
+      dut.clock.step(1)
+      dut.io.result.expect(0.U)
+      dut.clock.step(1)
+      dut.io.result.expect(8.U)
+      dut.clock.step(1)
+      dut.io.result.expect(2.U)
+      //dut.clock.step(1)
+      //dut.io.result.expect(-48.U)
+
+      /*
+       * TODO: Add testcases for all R-type instructions in 'BinaryFile' and check the expected results here
+       */
 
       dut.clock.step(1)
       dut.io.result.expect("hFFFFFFFF".U)
-           
+
     }
   }
 }
