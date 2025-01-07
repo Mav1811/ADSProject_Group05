@@ -133,7 +133,7 @@ class RV32Icore (BinaryFile: String) extends Module {
   val isXORI = (opcode === "b0010011".U && funct3 === "b100".U)
   val isSLLI = (opcode === "b0010011".U && funct3 === "b001".U)
   val isSRLI = (opcode === "b0010011".U && funct3 === "b101".U && shifttype === "b0".U)
-  val isSRAI = (opcode === "b0010011".U && funct3 === "b001".U && shifttype === "b1".U)
+  val isSRAI = (opcode === "b0010011".U && funct3 === "b101".U && shifttype === "b1".U)
 
 
   // Operands
@@ -145,9 +145,9 @@ class RV32Icore (BinaryFile: String) extends Module {
   val operandB = Wire(SInt(32.W))
   operandB := 0.S
   when( opcode === "b0010011".U){
-    val operandB = instr(31, 20).asSInt
+    operandB := instr(31, 20).asSInt
   }.elsewhen(opcode === "b0110011".U){
-    val operandB = regFile(instr(24, 20)).asSInt
+    operandB := regFile(instr(24, 20)).asSInt
   }
 
 
@@ -155,49 +155,49 @@ class RV32Icore (BinaryFile: String) extends Module {
   // Execute
   // -----------------------------------------
 
-  val aluResult = Wire(SInt(32.W))
+  val aluResult = Wire(UInt(32.W))
 
   when(isADDI) { // start of I type
-    aluResult := operandA + operandB
+    aluResult := (operandA + operandB).asUInt
   }.elsewhen(isSLTI) {
-    aluResult := (operandA  < operandB).asSInt
+    aluResult := (operandA  < operandB).asUInt
   }.elsewhen(isSLTIU) {
-    aluResult := (operandA.asUInt < (operandB).asUInt).asSInt
+    aluResult := (operandA.asUInt < (operandB).asUInt).asUInt
   }.elsewhen(isANDI) {
-    aluResult := operandA & operandB
+    aluResult := (operandA & operandB).asUInt
   }.elsewhen(isORI) {
-    aluResult := operandA | operandB
+    aluResult := (operandA | operandB).asUInt
   }.elsewhen(isXORI) {
-    aluResult := operandA ^ operandB
+    aluResult := (operandA ^ operandB).asUInt
   }.elsewhen(isSLLI) {
-    aluResult := operandA << shamt
+    aluResult := (operandA.asUInt << shamt).asUInt
   }.elsewhen(isSRLI) {
-    aluResult := (operandA >> shamt)
+    aluResult := (operandA.asUInt >> shamt).asUInt
   }.elsewhen(isSRAI) {
-    aluResult := (operandA >> shamt) //end of I Type
+    aluResult := (operandA.asSInt >> shamt).asUInt//end of I Type
   }.elsewhen(isADD) { // start of R type
-    aluResult := operandA + operandB
+    aluResult := (operandA + operandB).asUInt
   }.elsewhen(isSUB) {
-    aluResult := operandA - operandB
+    aluResult := (operandA - operandB).asUInt
   }.elsewhen(isAND) {
-    aluResult := operandA & operandB
+    aluResult := (operandA & operandB).asUInt
   }.elsewhen(isOR) {
-    aluResult := operandA | operandB
+    aluResult := (operandA | operandB).asUInt
   }.elsewhen(isXOR) {
-    aluResult := operandA ^ operandB
+    aluResult := (operandA ^ operandB).asUInt
   }.elsewhen(isSLT) {
-    aluResult := (operandA < operandB).asSInt
+    aluResult := (operandA < operandB).asUInt
   }.elsewhen(isSLTU) {
-    aluResult := (operandA.asUInt < operandB.asUInt).asSInt
+    aluResult := (operandA.asUInt < operandB.asUInt).asUInt
   }.elsewhen(isSLL) {
-    aluResult := operandA << operandB(4, 0)
+    aluResult := (operandA << operandB(4, 0).asUInt).asUInt
   }.elsewhen(isSRL) {
-    aluResult := (operandA.asUInt >> operandB(4, 0)).asSInt
+    aluResult := (operandA.asUInt >> operandB(4, 0).asUInt).asUInt
   }.elsewhen(isSRA) {
-    aluResult := (operandA >> operandB(4, 0))// end of R type
+      aluResult := (operandA >> operandB(4, 0).asUInt).asUInt// end of R type
   }.otherwise{
-    aluResult := 0.S// NOP
-    dontTouch(pc)
+    aluResult := 0.U// NOP
+    //dontTouch(pc)
   }
    /* TODO: Add missing R-Type instructions here. Do not forget to implement a suitable default
    *       fetched instructions that are neither R-Type nor ADDI.

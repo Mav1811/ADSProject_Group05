@@ -17,7 +17,6 @@ class SimpleRISCV32ITest extends AnyFlatSpec with ChiselScalatestTester {
     test(new SimpleRV32I("src/test/programs/BinaryFile")).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
 
       dut.clock.setTimeout(0)
-
       dut.io.result.expect(0.U)     // ADDI x0, x0, 0
       dut.clock.step(1)
       dut.io.result.expect(4.U)     // ADDI x1, x0, 4
@@ -26,40 +25,47 @@ class SimpleRISCV32ITest extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       dut.io.result.expect(9.U)     // ADD x3, x1, x2
       dut.clock.step(1)
-      //dut.io.result.expect(-4.U)
-      //dut.clock.step(1)
+      dut.io.result.expect("hFFFFFFFC".U)
+      dut.clock.step(1)
       dut.io.result.expect(8.U)
       dut.clock.step(1)
-      //dut.io.result.expect(-4.U)
-      //dut.clock.step(1)
-      //dut.io.result.expect(-60.U)
-     // dut.clock.step(1)
+      dut.io.result.expect("hFFFFFFFC".U)
+      dut.clock.step(1)
+      dut.io.result.expect("hFFFFFFF4".U)
+      dut.clock.step(1)
+      dut.io.result.expect("hFFFFFFC4".U)
+      dut.clock.step(1)
       dut.io.result.expect(1.U)
       dut.clock.step(1)
       dut.io.result.expect(0.U)
       dut.clock.step(1)
-      //dut.io.result.expect(-60.U)
-      //dut.clock.step(1)
+      dut.io.result.expect("hFFFFFFC4".U)
+      dut.clock.step(1)
       dut.io.result.expect(4.U)
       dut.clock.step(1)
-     // dut.io.result.expect(-8.U)
-      //dut.clock.step(1)
+      dut.io.result.expect("hFFFFFFFC".U)
+      dut.clock.step(1)
       dut.io.result.expect(0.U)
       dut.clock.step(1)
       dut.io.result.expect(0.U)
       dut.clock.step(1)
       dut.io.result.expect(8.U)
       dut.clock.step(1)
-      dut.io.result.expect(2.U)
-      //dut.clock.step(1)
-      //dut.io.result.expect(-48.U)
-
+      dut.io.result.expect("hFFFFFFFE".U)
+      dut.clock.step(1)
+      dut.io.result.expect("hFFFFFFD0".U)
+      dut.clock.step(1)
+      dut.io.result.expect(32.U)
+      dut.clock.step(1)
+      dut.io.result.expect(0.U)
+      dut.clock.step(1)
+      dut.io.result.expect(2.U) // SRAI X20, X17, 2
+      dut.clock.step(1)
       /*
        * TODO: Add testcases for all R-type instructions in 'BinaryFile' and check the expected results here
        */
 
-      dut.clock.step(1)
-      dut.io.result.expect("hFFFFFFFF".U)
+      dut.io.result.expect(0.U)
 
     }
   }
