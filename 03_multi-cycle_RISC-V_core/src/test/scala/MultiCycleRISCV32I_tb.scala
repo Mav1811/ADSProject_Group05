@@ -21,7 +21,7 @@ class MultiCycleRISCV32ITest extends AnyFlatSpec with ChiselScalatestTester {
        */
       dut.clock.setTimeout(0)
       dut.clock.step(4)
-//      dut.io.result.expect(4.U)     // ADDI x0, x0, 0
+      dut.io.result.expect(4.U)     // ADDI x0, x0, 0
       dut.clock.step(5)
       dut.io.result.expect(4.U)     // ADDI x1, x0, 4
       dut.clock.step(5)
