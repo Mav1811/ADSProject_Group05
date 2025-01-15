@@ -14,9 +14,9 @@ import core_tile._
 class MultiCycleRV32I (BinaryFile: String) extends Module {
 
   val io = IO(new Bundle {
-    val result    = Output(UInt(32.W)) 
+    val result    = Output(UInt(32.W))
     })
-  
+
   val core = Module(new MultiCycleRV32Icore(BinaryFile))
 
   io.result       := core.io.check_res
