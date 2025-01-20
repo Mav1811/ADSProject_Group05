@@ -75,16 +75,9 @@ class RV32Icore (BinaryFile: String) extends Module {
   val pc = RegInit(0.U(12.W))
 
   val regFile = Mem(32, UInt(32.W))
-  /*val regAdr_1 = Wire(UInt(5.W))
-  val regWriteEn = Wire(UInt(1.W))
-  val regAdr_2 = Wire(UInt(5.W))
-  val regA = RegInit(0.U(32.W))
-  val regB = RegInit(0.U(32.W))
-  val writeAddr = Wire(UInt(5.W))
-  val writeValue = Wire(UInt(5.W))
   /*
    * TODO: hard-wire register x0 to zero
-   */*/
+   */
   regFile(0) := 0.U
 
   // -----------------------------------------
@@ -196,7 +189,7 @@ class RV32Icore (BinaryFile: String) extends Module {
   }.elsewhen(isSRA) {
       aluResult := (operandA >> operandB(4, 0).asUInt).asUInt// end of R type
   }.otherwise{
-    aluResult := 0.U// NOP
+    aluResult := 0.U// DEFAULT FUNCTION
     //dontTouch(pc)
   }
    /* TODO: Add missing R-Type instructions here. Do not forget to implement a suitable default
