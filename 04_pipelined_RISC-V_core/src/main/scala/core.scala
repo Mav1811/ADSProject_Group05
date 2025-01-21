@@ -71,7 +71,7 @@ import chisel3.util.experimental.loadMemoryFromFile
 // -----------------------------------------
 
 object uopc extends ChiselEnum {
-//// ADD for other ISAs
+
   val isADD   = Value(0x01.U)
   val isSUB   = Value(0x02.U)
   val isXOR   = Value(0x03.U)
@@ -97,88 +97,64 @@ object uopc extends ChiselEnum {
 }
 
 import uopc._
-val fetch :: decode :: execute :: memory :: writeback :: Nil = Enum(5) // Enum datatype to define the stages of the processor FSM
-val stage = RegInit(fetch)
+
 
 // -----------------------------------------
 // Register File
 // -----------------------------------------
 
 class regFileReadReq extends Bundle {
-  // what signals does a read request need?
-  val addr = UInt(5.W)  // First register rs1 address (5 bits for a 32-register file)
-  // val addr2 = UInt(5.W)  // Second register rs2 address (5 bits for a 32-register file)
+  val addr = Input(UInt(5.W))
 }
 
 class regFileReadResp extends Bundle {
-  // what signals does a read response need?
-  val data = UInt(32.W)  // Data that is read from the first register
-  //val data2 = UInt(32.W)  // Data that is read from the second register
+  val data = Output(SInt(32.W))
 }
 
 class regFileWriteReq extends Bundle {
-  // what signals does a write request need?
-  val addr = UInt(5.W)    // Register address (5 bits for the 32-register file)
-  val data = UInt(32.W)   // Data to be written to the register
-  val writeEnable = Bool() // Signal to enable or disable the write operation
+  val addr = Input(UInt(5.W))
+  val data = Input(UInt(32.W))
+  val en = Input(UInt(1.W))
 }
 
 class regFile extends Module {
   val io = IO(new Bundle {
-    val req1  = new regFileReadReq
-    val req2  = new regFileReadReq
-
-    val resp1 = new regFileReadResp
-    val resp2 = new regFileReadResp
-
-    val writereq = new regFileWriteReq
-    // how many read and write ports do you need to handle all requests
-    // from the ipeline to the register file simultaneously?
-
+    val readReq1 = new regFileReadReq
+    val readResp1 = new regFileReadResp
+    val readReq2 = new regFileReadReq
+    val readResp2 = new regFileReadResp
+    val writeReq = new regFileWriteReq
   })
-  /*
-  TODO: Initialize the register file as described in the task
-        and handle the read and write requests
- */
 
+  val regFile_ = Mem(32, UInt(32.W))
+  regFile_(0.U) := 0.U
 
-  val regFile = Mem(32, UInt(32.W))
-  regFile(0) := 0.U
+  io.readResp1.data := regFile_(io.readReq1.addr).asSInt
+  io.readResp2.data := regFile_(io.readReq2.addr).asSInt
 
-  io.resp1.data := regFile(io.req1.addr)
-  io.resp2.data := regFile(io.req2.addr)
-  when(io.writereq.addr =/= 0.U && io.writereq.writeEnable === 1){
-    regFile(io.writereq.addr) := io.writereq.data
+  when(io.writeReq.en.asBool && (io.writeReq.addr =/= 0.U)) {
+    regFile_(io.writeReq.addr) := io.writeReq.data
   }
-
-
-
-
 }
+
+
 // -----------------------------------------
 // Fetch Stage
 // -----------------------------------------
 
-class IF (BinaryFile: String) extends Module {
+class IF(BinaryFile: String) extends Module {
   val io = IO(new Bundle {
-    // What inputs and / or outputs does this pipeline stage need?
-    //Inputs
-    val old_pc = Input(UInt(16.W)) // fedback from IF barrier
-
-    // Outputs
     val instr = Output(UInt(32.W))
-    val pc = Output(UInt(16.W))
   })
+
+  val pc = RegInit(0.U(32.W))
   val IMem = Mem(4096, UInt(32.W))
   loadMemoryFromFile(IMem, BinaryFile)
-  //val ifBarrier = Module(new IFBarrier)//  This is to be done in the main function
-  io.instr := IMem(old_pc >> 2.U)
-  //ifBarrier.io.instr := io.instr// This is to be done in the main function
-  io.pc := pc_old + 4.U
-  // io.pc := pc_reg
 
-  //IF-> IF Barrier(registers)
+  io.instr := IMem(pc >> 2.U)
+  pc := pc + 4.U
 }
+
 
 // -----------------------------------------
 // Decode Stage
@@ -186,108 +162,76 @@ class IF (BinaryFile: String) extends Module {
 
 class ID extends Module {
   val io = IO(new Bundle {
-    //IF-> IF Barrier->ID
-
-    // Inputs
-    val instr_decode = Input(UInt(32.W)) // from IF_Barrier
-
-    // Outputs
-    val immediate_opB  = Output(SInt(32.W)) // immediate value for the I type
-    val operandA = Output(SInt(32.W)) //regfile operation in the main function
-    val operandB = Output(SInt(32.W)) //regfile operation in the main function
-    val rd_out = Output(UInt(5.W)) //address of RD for result writing in WB
-    val shifttype_out = Output(UInt(1.W)) // Shift type needed for operation in EX
-    val upoc = Output(upoc())  // The operation Micro coded
-
+    val instr = Input(UInt(32.W))
+    val uop = Output(uopc())
+    val rs1 = Output(UInt(5.W))
+    val rs2 = Output(UInt(5.W))
+    val rd = Output(UInt(5.W))
+    val imm = Output(SInt(12.W))
   })
-  // Internal Signals
-  val rs1 = Wire(UInt(5.W))
-  val rs2 = Wire(UInt(5.W))
-  val rd =  Wire(UInt(5.W))
-  val imm = Wire(UInt(12.W))
-  val shifttype = Wire(UInt(1.W))
-  val funct3 = Wire(UInt(3.W))
-  val funct7 = Wire(UInt(7.W))
-  val opcode = Wire(UInt(7.W))
 
-  //Value assignment fot internal registers
+  val opcode = io.instr(6, 0)
+  val funct3 = io.instr(14, 12)
+  val funct7 = io.instr(31, 25)
+  val rs1 = io.instr(19, 15)
+  val rs2 = io.instr(24, 20)
+  val rd = io.instr(11, 7)
+  val imm = io.instr(31, 20)
+  val shifttype = io.instr(30)
 
-  opcode = instr_decode(6, 0)
-  funct3 = instr_decode(14, 12)
-  funct7 = instr_decode(31, 25)
-  shifttype = instr_decode(30)
-  rd = instr_decode(11, 7)
-  rs1 = instr_decode(19, 15)
-  rs2 = instr_decode(24, 20)
-  imm =  instr_decode(31, 20)
-    when(opcode === "b0110011".U && funct3 === "b000".U && funct7 === "b0000000".U) {
-      io.upoc := isADD
-    }.elsewhen(opcode === "b0110011".U && funct3 === "b000".U && funct7 === "b0100000".U) {
-     io.upoc := isSUB
-    }.elsewhen(opcode === "b0110011".U && funct3 === "b111".U && funct7 === "b0000000".U) {
-     io.upoc := isAND
-    }.elsewhen(opcode === "b0110011".U && funct3 === "b110".U && funct7 === "b0000000".U) {
-     io.upoc := isOR
-    }.elsewhen(opcode === "b0110011".U && funct3 === "b100".U && funct7 === "b0000000".U) {
-     io.upoc := isXOR
-    }.elsewhen(opcode === "b0110011".U && funct3 === "b011".U && funct7 === "b0000000".U) {
-     io.upoc := isSLTU
-    }.elsewhen(opcode === "b0110011".U && funct3 === "b010".U && funct7 === "b0000000".U) {
-     io.upoc := isSLT
-    }.elsewhen(opcode === "b0110011".U && funct3 === "b001".U && funct7 === "b0000000".U) {
-     io.upoc := isSLL
-    }.elsewhen(opcode === "b0110011".U && funct3 === "b101".U && funct7 === "b0000000".U) {
-     io.upoc := isSRL
-    }.elsewhen(opcode === "b0110011".U && funct3 === "b101".U && funct7 === "b0100000".U) {
-     io.upoc := isSRA
-    }.elsewhen(opcode === "b0010011".U && funct3 === "b000".U) {
-     io.upoc := isADDI
-    }.elsewhen(opcode === "b0010011".U && funct3 === "b010".U) {
-     io.upoc := isSLTI
-    }.elsewhen(opcode === "b0010011".U && funct3 === "b011".U) {
-     io.upoc := isSLTIU
-    }.elsewhen(opcode === "b0010011".U && funct3 === "b111".U) {
-     io.upoc := isANDI
-    }.elsewhen(opcode === "b0010011".U && funct3 === "b110".U) {
-     io.upoc := isORI
-    }.elsewhen(opcode === "b0010011".U && funct3 === "b100".U) {
-     io.upoc := isXORI
-    }.elsewhen(opcode === "b0010011".U && funct3 === "b001".U) {
-     io.upoc := isSLLI
-    }.elsewhen(opcode === "b0010011".U && funct3 === "b101".U && shifttype === "b0".U) {
-     io.upoc := isSRLI
-    }.elsewhen(opcode === "b0010011".U && funct3 === "b101".U && shifttype === "b1".U) {
-     io.upoc := isSRAI
-    }.otherwise{
-     io.upoc := invalid
+  io.rs1 := rs1
+  io.rs2 := rs2
+  io.rd := rd
+  io.imm := imm.asSInt
+
+  io.uop := uopc.invalid
+  switch(opcode) {
+    is("b0110011".U) { // R-type
+      switch(funct3) {
+        is("b000".U) { // ADD, SUB
+          when(funct7 === "b0000000".U) {
+            io.uop := uopc.isADD
+          } .otherwise {
+            io.uop := uopc.isSUB
+          }
+        }
+        is("b001".U) { io.uop := uopc.isSLL }
+        is("b010".U) { io.uop := uopc.isSLT }
+        is("b011".U) { io.uop := uopc.isSLTU }
+        is("b100".U) { io.uop := uopc.isXOR }
+        is("b101".U) { // SRL, SRA
+          when(funct7 === "b0000000".U) {
+            io.uop := uopc.isSRL
+          } .otherwise {
+            io.uop := uopc.isSRA
+          }
+        }
+        is("b110".U) { io.uop := uopc.isOR }
+        is("b111".U) { io.uop := uopc.isAND }
+      }
     }
-  // Operand A nd B are referenced from reguster file in main function
-    io.immediate_opB := imm.asSInt
-    io.shifttype_out := shifttype.asUInt
-    io.rd_out := rd
-  //IF-> IF Barrier->ID-> ID Barrier(registers)
+    is("b0010011".U) { // I-type
+      switch(funct3) {
+        is("b000".U) { io.uop := uopc.isADDI }
+        is("b001".U) { io.uop := uopc.isSLLI }
+        is("b010".U) { io.uop := uopc.isSLTI }
+        is("b011".U) { io.uop := uopc.isSLTIU }
+        is("b100".U) { io.uop := uopc.isXORI }
+        is("b101".U) {
+          when(shifttype === 0.U) {
+            io.uop := uopc.isSRLI
+          } .otherwise {
+            io.uop := uopc.isSRAI
+          }
+        }
+        is("b110".U) { io.uop := uopc.isORI }
+        is("b111".U) { io.uop := uopc.isANDI }
 
-
-   /*val Register1 := Module(new regFile)  NEEDS TO BE GIVEN OUTSIDE
-   io.Register1.req1.addr:= io.rs1
-   io.operandA  := io.Register1.resp1.data
-  when( opcode === "b0010011".U){
-    operandB := imm.asSInt
-  }.elsewhen(opcode === "b0110011".U){
-    io.Register1.req2.addr:= io.rs2
-    io.operandB := io.Register1.resp2.data
+      }
+    }
   }
-    io.rd_out := io.rd
-
-   /* val idBarrier := Module(new IDBarrier) NEEDS TO BE GIVEN OUTSIDE
-    idBarrier.io.upoc := io.upoc
-    idBarrier.io.operandA := io.operandA
-    idBarrier.io.operandB := io.operandB
-    idBarrier.io.rd_out := io.rd_out
-
-    stage := execute*/ */
-
 }
+
 
 // -----------------------------------------
 // Execute Stage
@@ -295,84 +239,38 @@ class ID extends Module {
 
 class EX extends Module {
   val io = IO(new Bundle {
-    // What inputs and / or outputs does this pipeline stage need?
-  /// Inputs
-    val operandA  = Input(SInt(32.W))
-    val operandB  = Input(SInt(32.W))
-    val Immediate_opB_in  = Input(SInt(32.W))
-    val uopc = Input(upoc())
-    val rd_in = Input(UInt(5.W))
-
-    // Outputs
-    val aluresult  = Output(UInt(32.W)
-    val rd_out = Output(UInt(5.W))
-
-
+    val uop = Input(uopc())
+    val operandA = Input(SInt(32.W))
+    val operandB = Input(SInt(32.W))
+    val imm = Input(SInt(12.W))
+    val aluResult = Output(UInt(32.W))
   })
 
-  /* 
-  val idBarrier1 := Module(new IDBarrier)     //// In the main function
+  io.aluResult := "hFFFFFFFF".U
+  switch(io.uop) {
+    is(uopc.isADD) { io.aluResult := (io.operandA + io.operandB).asUInt }
+    is(uopc.isSUB) { io.aluResult := (io.operandA - io.operandB).asUInt }
+    is(uopc.isXOR) { io.aluResult := (io.operandA ^ io.operandB).asUInt }
+    is(uopc.isOR) { io.aluResult := (io.operandA | io.operandB).asUInt }
+    is(uopc.isAND) { io.aluResult := (io.operandA & io.operandB).asUInt }
+    is(uopc.isSLL) { io.aluResult := (io.operandA << io.operandB(4, 0)).asUInt }
+    is(uopc.isSRL) { io.aluResult := (io.operandA >> io.operandB(4, 0)).asUInt }
+    is(uopc.isSRA) { io.aluResult := (io.operandA.asSInt >> io.operandB(4, 0)).asUInt }
+    is(uopc.isSLT) { io.aluResult := (io.operandA.asSInt < io.operandB.asSInt).asUInt }
+    is(uopc.isSLTU) { io.aluResult := (io.operandA.asUInt < io.operandB.asUInt).asUInt }
 
-  io.operandA := idBarrier1.io.opA
-  io.operandB := idBarrier1.io.opB
-  io.upoc := idBarrier1.io.operation
-  io.rd := idBarrier1.io.rd_Barrier_out
-
-   */
-
-      /*
-     * TODO: Implement execute stage
-     */
-
-    when(uopc === isADDI) { // start of I type
-      io.aluResult := (operandA + Immediate_opB_in).asUInt
-    }.elsewhen(uopc ===isSLTI) {
-      io.aluResult := (operandA  < Immediate_opB_in).asUInt
-    }.elsewhen(uopc ===isSLTIU) {
-      io.aluResult := (operandA.asUInt < (Immediate_opB_in).asUInt).asUInt
-    }.elsewhen(uopc === isANDI) {
-      io.aluResult := (operandA & Immediate_opB_in).asUInt
-    }.elsewhen(uopc === isORI) {
-      io.aluResult := (operandA | Immediate_opB_in).asUInt
-    }.elsewhen(uopc === isXORI) {
-      io.aluResult := (operandA ^ Immediate_opB_in).asUInt
-    }.elsewhen(uopc === isSLLI) {
-      io.aluResult := (operandA.asUInt << rs2).asUInt
-    }.elsewhen(uopc === isSRLI) {
-      io.aluResult := (operandA.asUInt >> rs2).asUInt
-    }.elsewhen(uopc === isSRAI) {
-      io.aluResult := (operandA.asSInt >> rs2).asUInt//end of I Type
-    }.elsewhen(uopc === isADD) { // start of R type
-      io.aluResult := (operandA + operandB).asUInt
-    }.elsewhen(uopc === isSUB) {
-      io.aluResult := (operandA - operandB).asUInt
-    }.elsewhen(uopc === isAND) {
-      io.aluResult := (operandA & operandB).asUInt
-    }.elsewhen(uopc === isOR) {
-      io.aluResult := (operandA | operandB).asUInt
-    }.elsewhen(uopc === isXOR) {
-      io.aluResult := (operandA ^ operandB).asUInt
-    }.elsewhen(uopc === isSLT) {
-      io.aluResult := (operandA < operandB).asUInt
-    }.elsewhen(uopc === isSLTU) {
-      io.aluResult := (operandA.asUInt < operandB.asUInt).asUInt
-    }.elsewhen(uopc === isSLL) {
-      io.aluResult := (operandA << operandB(4, 0).asUInt).asUInt
-    }.elsewhen(uopc === isSRL) {
-      io.aluResult := (operandA.asUInt >> operandB(4, 0).asUInt).asUInt
-    }.elsewhen(iuopc === sSRA) {
-      io.aluResult := (operandA >> operandB(4, 0).asUInt).asUInt// end of R type
-    }.otherwise{
-      io.aluResult := "hFFFFFFFF".U// NOP
-      //dontTouch(pc)
-    }
-    io.rd_out := io.rd_in
-   /* val exBarrier = Module(new EXBarrier)         Outside memory
-    exBarrier.io.aluResult := io.aluResult
-    exBarrier.io.rd := io.rd_out*/
+    is(uopc.isADDI) { io.aluResult := (io.operandA + io.imm).asUInt }
+    is(uopc.isSLTI) { io.aluResult := (io.operandA.asSInt < io.imm).asUInt }
+    is(uopc.isSLTIU) { io.aluResult := (io.operandA.asUInt < io.imm.asUInt).asUInt }
+    is(uopc.isXORI) { io.aluResult := (io.operandA ^ io.imm).asUInt }
+    is(uopc.isORI) { io.aluResult := (io.operandA | io.imm).asUInt }
+    is(uopc.isANDI) { io.aluResult := (io.operandA & io.imm).asUInt }
+    is(uopc.isSLLI) { io.aluResult := (io.operandA << io.imm(4, 0)).asUInt }
+    is(uopc.isSRLI) { io.aluResult := (io.operandA >> io.imm(4, 0)).asUInt }
+    is(uopc.isSRAI) { io.aluResult := (io.operandA.asSInt >> io.imm(4, 0)).asUInt }
   }
-
 }
+
 
 // -----------------------------------------
 // Memory Stage
@@ -380,31 +278,12 @@ class EX extends Module {
 
 class MEM extends Module {
   val io = IO(new Bundle {
-    // What inputs and / or outputs does this pipeline stage need?
-    // Inputs
-    val aluResult_in = Input(UInt(32.W))
-    val rd_in = Input(UInt(5.W))
-    // Outputs
-    val Writeback_out = Output(UInt(32.W))
-    val rd_out = Output(UInt(5.W))
+    val aluResult = Input(UInt(32.W))
+    val memResult = Output(UInt(32.W))
+  })
 
-  }
-
-  // No memory operations implemented in this basic CPU   // done in Main function
-    /*val exBarrier = Module(new EXBarrier)
-    val memBarrier = Module(new MEMBarrier)
-    io.aluResult := io.exBarrier.Writeback
-
-    io.rd := io.exBarrier.rd_barrier_out
-    io.rd_out := io.rd
-    io.memBarrier.Writeback := io.Writeback
-    io.memBarrier.rd := io.rd_out
-    state := WriteBack
-
-     */
-    io.Writeback_out := io.aluResult_in
-    io.rd_out := io.rd_in
-
+  // No memory operations implemented in this basic CPU
+  io.memResult := io.aluResult
 }
 
 
@@ -414,32 +293,17 @@ class MEM extends Module {
 
 class WB extends Module {
   val io = IO(new Bundle {
-    // What inputs and / or outputs does this pipeline stage need?
-    val Writeback_data = Input(UInt(32.W))
-    val Writeback_address = Input(UInt(5.W)) // rd value
-    val checkres = Output(UInt(32.W))
-
+    val memResult = Input(UInt(32.W)) // Input result
+    val rd = Input(UInt(5.W))
+    val writeBackData = Output(UInt(32.W)) // Output result
+    val writeAddress = Output(UInt(5.W))
+    val writeEnable = Output(UInt(1.W))
   })
-  // Internal signals
-  val write_en = Wire(UInt(1.W))
-  write_en := 1.U
 
-  // Write in registter file is carried in main function
-
-  /*val memBarrier = Module(new MEMBarrier)
-  val wbBarrier = Module(new WBBarrier)
-  io.Writeback_data = io.memBarrier.Writeback_Barrierout
-  io.Writeback_address = io.memBarrier.Writeback.rd_barrier_out
-  val Register1 := Module(new regFile)
-  io.Register1.writereq.data :=  io.Writeback_data
-  io.Register1.writereq.writeEnable := io.write_en
-  io.Register1.writereq.addr := io.Writeback_address
-   */
-
-  // Output
-  io.checkres := io.Writeback_data
+  io.writeBackData := io.memResult
+  io.writeAddress := io.rd
+  io.writeEnable := 1.U
 }
-
 
 
 // -----------------------------------------
@@ -448,23 +312,14 @@ class WB extends Module {
 
 class IFBarrier extends Module {
   val io = IO(new Bundle {
-    // What inputs and / or outputs does this barrier need?
-    val pc_in = Input(UInt(32.W))
-    val instr_in = Input(UInt(32.W))
+    val instr = Input(UInt(32.W))
     val instr_out = Output(UInt(32.W))
-    val pc_out = Output(UInt(32.W))
-
   })
-  // Registers
-  val instr_reg = RegInit(0.U(32.W)
-  instr_reg := io.instr_in
-  val pc_reg := RegInit(0.U(32.W)
-  pc_reg := io.pc_in
 
-  //Outputs
-  io.instr_out := instr_reg
-  io.pc_out := pc_reg
- }
+  val instrReg = RegNext(io.instr)
+
+  io.instr_out := instrReg
+}
 
 
 // -----------------------------------------
@@ -473,35 +328,41 @@ class IFBarrier extends Module {
 
 class IDBarrier extends Module {
   val io = IO(new Bundle {
+    val uop = Input(uopc())
+    val rs1 = Input(SInt(32.W))
+    val rs2 = Input(SInt(32.W))
+    val rd = Input(UInt(5.W))
+    val imm = Input(SInt(12.W))
 
-    // What inputs and / or outputs does this barrier need?
-    val operandA_in = Input(SInt(32.W))
-    val operandB_in = Input(SInt(32.W))
-    val immediate_in = Input(SInt(32.W))
-    val upoc_in = Input(upoc())
-    val rd_in = Input(UInt(5.W))
-    // Outputs
-    val opA_out = Output(SInt(32.W))
-    val opB_out = Output(SInt(32.W))
-    val operation_out = Output(upoc())
+    val uop_out = Output(uopc())
+    val rs1_out = Output(SInt(32.W))
+    val rs2_out = Output(SInt(32.W))
     val rd_out = Output(UInt(5.W))
-    val immediate_out = Output(SInt(32.W))
+    val imm_out = Output(SInt(12.W))
   })
-// Internal Registers
-  val operandA_reg = RegInit(0.asSInt(32.W))
-  val operandB_reg = RegInit(0.asSInt(32.W))
-  val Immediate_reg = RegInit(0.asSInt(32.W))
-  val upo_reg = RegInit(uopc.isADD) // the data type is an enum!
-  val rd_reg = RegInit(0.asUInt(5.W))
-  operandA_reg := io.operandA_in
-  operandB_reg := io.operandB_in
-  rd_reg := io.rd_in
-  upo_reg := io.upoc_in
-  io.opA_out := operandA_reg
-  io.opB_out := operandB_reg
-  io.operation_out := upo_reg
-  io.rd_out := rd_reg
-  io.immediate_out := Immediate_reg
+
+  val uopReg = RegNext(io.uop)
+  val rs1Reg = RegNext(io.rs1)
+  val rs2Reg = RegNext(io.rs2)
+  val rdReg = RegNext(io.rd)
+  val immReg = RegNext(io.imm)
+  // val uopReg = RegInit(io.uop)
+  // val rs1Reg = RegInit(0.U(32.W))
+  // val rs2Reg = RegInit(0.U(32.W))
+  // val rdReg = RegInit(0.U(5.W))
+  // val immReg = RegInit(0.U(12.W))
+
+  // uopReg := io.uop
+  // rs1Reg := io.rs1
+  // rs2Reg := io.rs2
+  // rdReg := io.rd
+  // immReg := io.imm
+
+  io.uop_out := uopReg
+  io.rs1_out := rs1Reg
+  io.rs2_out := rs2Reg
+  io.rd_out := rdReg
+  io.imm_out := immReg
 }
 
 
@@ -511,22 +372,17 @@ class IDBarrier extends Module {
 
 class EXBarrier extends Module {
   val io = IO(new Bundle {
-    // What inputs and / or outputs does this barrier need?
-    // Inputs
-    val aluResult_in = Input(UInt(32.W))
-    val rd_in = Input(UInt(5.W))
-    // outputs
-    val Writeback = Output(UInt(32.W))
-    val rd_barrier_out = Output (UInt(5.W))
+    val aluResult = Input(UInt(32.W))
+    val rd = Input(UInt(5.W))
+    val aluResult_out = Output(UInt(32.W))
+    val rd_out = Output(UInt(5.W))
   })
-  /// Internal registers
-  val rd_reg = RegInit(0.asUInt(5.W))
-  val aluResult_reg = RegInit(0.asUInt(32.W))
-  aluResult_reg := io.aluResult_in
-  rd_reg := io.rd_in
-  // Ouputs
-  io.Writeback := aluResult_reg
-  io.rd_barrier_out := rd_reg
+
+  val aluResultReg = RegNext(io.aluResult)
+  val rdReg = RegNext(io.rd)
+
+  io.aluResult_out := aluResultReg
+  io.rd_out := rdReg
 }
 
 
@@ -536,24 +392,17 @@ class EXBarrier extends Module {
 
 class MEMBarrier extends Module {
   val io = IO(new Bundle {
-    // What inputs and / or outputs does this barrier need?
-    // Inputs
-    val Writeback_in = Input(UInt(32.W))
-    val rd_in = Input(UInt(5.W))
-    // Outputs
-    val Writeback_Barrierout = Output(UInt(32.W))
-    val rd_barrier_out = Output (UInt(5.W))
-
+    val memResult = Input(UInt(32.W))
+    val rd = Input(UInt(5.W))
+    val memResult_out = Output(UInt(32.W))
+    val rd_out = Output(UInt(5.W))
   })
-  // Internal registers
-  val Writeback_reg := RegInit(0.asUInt(32.W)))
-  val rd_reg = RegInit(0.asUInt(5.W))
-  Writeback_reg := io.Writeback_in
-  rd_reg := io.rd_in
 
-  // Outputs
-  io.Writeback_Barrierout := Writeback_reg
-  io.rd_barrier_out := rd_reg
+  val memResultReg = RegNext(io.memResult)
+  val rdReg = RegNext(io.rd)
+
+  io.memResult_out := memResultReg
+  io.rd_out := rdReg
 }
 
 
@@ -563,71 +412,83 @@ class MEMBarrier extends Module {
 
 class WBBarrier extends Module {
   val io = IO(new Bundle {
-    // What inputs and / or outputs does this barrier need?
-    val check_res_in = Input(UInt(32.W))
-    val check_res_out = Output(UInt(32.W))
-
+    val writeBackData = Input(UInt(32.W))
+    val writeBackData_out = Output(UInt(32.W))
   })
-  // Internal registers
-  val check_res_reg = RegInit(0.asUInt(32.W))
-  check_res_reg := io.check_res
-  // Outputs
-  io.check_res_out := check_res_reg
 
+  val writeBackDataReg = RegNext(io.writeBackData)
+
+  io.writeBackData_out := writeBackDataReg
 }
 
 
-
-class PipelinedRV32Icore (BinaryFile: String) extends Module {
+class PipelinedRV32Icore(BinaryFile: String) extends Module {
   val io = IO(new Bundle {
-    val check_res_final = Output(UInt(32.W))
+    val check_res = Output(UInt(32.W))
   })
 
+  // Instantiate Barriers
+  val ifBarrier = Module(new IFBarrier)
+  val idBarrier = Module(new IDBarrier)
+  val exBarrier = Module(new EXBarrier)
+  val memBarrier = Module(new MEMBarrier)
+  val wbBarrier = Module(new WBBarrier)
 
-  /* 
-   * TODO: Instantiate Barriers
-   */
-  val if_barrier = Module(new IFBarrier)
-  val id_barrier = Module(new IDBarrier)
-  val ex_barrier = Module(new EXBarrier)
-  val mem_barrier = Module(new MEMBarrier)
-  val wb_barrier = Module(new WBBarrier)
+  // Instantiate Pipeline Stages
+  val ifStage = Module(new IF(BinaryFile))
+  val idStage = Module(new ID)
+  val exStage = Module(new EX)
+  val memStage = Module(new MEM)
+  val wbStage = Module(new WB)
 
-
-  /* 
-   * TODO: Instantiate Pipeline Stages
-   */
-  val if_stage = Module(new IF(BinaryFile))
-  val id_stage = Module(new ID)
-  val ex_stage = Module(new EX)
-  val mem_stage = Module(new MEM)
-  val wb_stage = Module(new WB)
-
-
-  /* 
-   * TODO: Instantiate Register File
-   */
   val regFile = Module(new regFile)
 
-  // feedback for pc in IF
-  // IF -> IF barrier
-  //IF barrier -> ID
-  // Register file memory read:- op_A and op_B (in-address and out-resp)
-  //ID-> ID barrier
-  // ID barrier-> EX
-  // EX-> EX barrier
-  //EX barrier-> MEM
-  //MEM-> MEMbarrier
-  //Membarrier-> WB
-  // Register file memory write:- Write_data , Write address, Write_en
-  //WB-> WBbarrier
-  // Final out assignment from WB barrier
+  // IF Stage connections
+  ifBarrier.io.instr := ifStage.io.instr
 
+  // ID Stage connections
+  idStage.io.instr := ifBarrier.io.instr_out
+  regFile.io.readReq1.addr := idStage.io.rs1
+  regFile.io.readReq2.addr := idStage.io.rs2
 
+  // ID Barrier connections
+  idBarrier.io.uop := idStage.io.uop
+  idBarrier.io.rs1 := regFile.io.readResp1.data
+  idBarrier.io.rs2 := regFile.io.readResp2.data
+  idBarrier.io.rd := idStage.io.rd
+  idBarrier.io.imm := idStage.io.imm
 
-  // all wires between the modules are connected here
+  // EX Stage connections
+  exStage.io.uop := idBarrier.io.uop_out
+  exStage.io.operandA := idBarrier.io.rs1_out
+  exStage.io.operandB := idBarrier.io.rs2_out
+  exStage.io.imm := idBarrier.io.imm_out
 
-  io.check_res_final := 0.U // necessary to make the empty design buildable TODO: change this
+  // EX Barrier connections
+  exBarrier.io.aluResult := exStage.io.aluResult
+  exBarrier.io.rd := idBarrier.io.rd_out
 
+  // MEM Stage connections
+  memStage.io.aluResult := exBarrier.io.aluResult_out
+
+  // MEM Barrier connections
+  memBarrier.io.memResult := memStage.io.memResult
+  memBarrier.io.rd := exBarrier.io.rd_out
+
+  // WB Stage connections
+  wbStage.io.memResult := memBarrier.io.memResult_out
+  wbStage.io.rd := memBarrier.io.rd_out
+
+  // WB Barrier connection
+  wbBarrier.io.writeBackData := wbStage.io.writeBackData
+
+  // Register File write connections
+  regFile.io.writeReq.addr := wbStage.io.writeAddress
+  regFile.io.writeReq.data := wbStage.io.writeBackData
+  regFile.io.writeReq.en := wbStage.io.writeEnable
+
+  // Output connection
+  io.check_res := wbBarrier.io.writeBackData_out
+
+  printf(p"writeBackData: 0x${Hexadecimal(wbBarrier.io.writeBackData_out)}\n")
 }
-
