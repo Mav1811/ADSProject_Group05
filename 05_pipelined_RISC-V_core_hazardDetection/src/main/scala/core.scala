@@ -85,16 +85,24 @@ class regFile extends Module {
 
   val regFile = Mem(32, UInt(32.W))
   regFile(0) := 0.U                           // hard-wired zero for x0
-
-  when(io.req_3.wr_en){
-    when(io.req_3.addr =/= 0.U){
-      regFile(io.req_3.addr) := io.req_3.data
-    }
+  
+  def readWithForwarding(readAddr: UInt): UInt = {
+    val isZeroReg = readAddr === 0.U
+    val isWriting = io.req_3.wr_en && (io.req_3.addr === readAddr)
+    
+    Mux(isZeroReg, 0.U,                    // Return 0 if reading x0
+        Mux(isWriting, io.req_3.data,      // Forward written data if same address
+            regFile(readAddr)))             // Otherwise read from register file
   }
 
-  io.resp_1.data := Mux(io.req_1.addr === 0.U, 0.U, regFile(io.req_1.addr))
-  io.resp_2.data := Mux(io.req_2.addr === 0.U, 0.U, regFile(io.req_2.addr))
+  // Connect read ports with forwarding logic
+  io.resp_1.data := readWithForwarding(io.req_1.addr)
+  io.resp_2.data := readWithForwarding(io.req_2.addr)
 
+  // Write logic
+  when(io.req_3.wr_en && (io.req_3.addr =/= 0.U)) {
+    regFile(io.req_3.addr) := io.req_3.data
+  }
 }
 
 class ForwardingUnit extends Module {
