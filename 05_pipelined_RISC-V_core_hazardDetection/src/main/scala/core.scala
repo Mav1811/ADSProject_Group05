@@ -118,8 +118,6 @@ class ForwardingUnit extends Module {
     io.operandA_frwd := 2.U
   }.elsewhen((io.rs1_addr === io.rd_addr_exbarrier)  && (io.rs1_addr =/= 0.U)){
       io.operandA_frwd := 1.U
-    }.elsewhen((io.rs1_addr === io.rd_addr_wbbarrier)  && (io.rs1_addr =/= 0.U)){
-      io.operandA_frwd := 3.U
     }.otherwise{
      io.operandA_frwd := 0.U
   }
@@ -127,8 +125,6 @@ class ForwardingUnit extends Module {
     io.operandB_frwd := 2.U
   }.elsewhen((io.rs2_addr === io.rd_addr_exbarrier) && (io.rs2_addr =/= 0.U)){
       io.operandB_frwd := 1.U
-    }.elsewhen((io.rs2_addr === io.rd_addr_wbbarrier) && (io.rs2_addr =/= 0.U)){
-      io.operandB_frwd := 3.U
     }.otherwise{
     io.operandB_frwd := 0.U
   }
@@ -533,8 +529,8 @@ class HazardDetectionRV32Icore (BinaryFile: String) extends Module {
   */
 
   EX.io.uop := IDBarrier.io.outUOP
-  EX.io.operandA := Mux(frwd_unit.io.operandA_frwd === 0.U,IDBarrier.io.outOperandA, Mux(frwd_unit.io.operandA_frwd === 2.U,MEMBarrier.io.outAluResult,  Mux(frwd_unit.io.operandA_frwd === 3.U,WBBarrier.io.outCheckRes,EXBarrier.io.outAluResult)))
-  EX.io.operandB:= Mux(frwd_unit.io.operandB_frwd === 0.U,IDBarrier.io.outOperandB, Mux(frwd_unit.io.operandB_frwd === 2.U,MEMBarrier.io.outAluResult,Mux(frwd_unit.io.operandB_frwd === 3.U,,WBBarrier.io.outCheckRes,EXBarrier.io.outAluResult)))
+  EX.io.operandA := Mux(frwd_unit.io.operandA_frwd === 0.U,IDBarrier.io.outOperandA, Mux(frwd_unit.io.operandA_frwd === 2.U,MEMBarrier.io.outAluResult, EXBarrier.io.outAluResult))
+  EX.io.operandB:= Mux(frwd_unit.io.operandB_frwd === 0.U,IDBarrier.io.outOperandB, Mux(frwd_unit.io.operandB_frwd === 2.U,MEMBarrier.io.outAluResult,EXBarrier.io.outAluResult))
   /*
     TODO: Connect operand inputs in EX stage to forwarding logic
   */
