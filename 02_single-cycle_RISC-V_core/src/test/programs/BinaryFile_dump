@@ -1,27 +1,57 @@
-0x00400013// ADDI x0, x0, 0 | NOP
-00400093// ADDI x0, x0, 4
+0x00400013// ADDI x0, x0, 4 | NOP
+00400093// ADDI x1, x0, 4
 00500113// ADDI x2, x0, 5
+// nop
+// nop
+// nop
 002081b3// ADD x3, x1, x2
+// nop
+// nop
+// nop
 40310233// SUB X4, X2,X3 - 000010110011
+// nop
+// nop
+// nop
 0041F2B3// AND X5, X3,X4- 0110011 -
+// nop
+// nop
+// nop
 00526333 // OR X6, X4,X5- 0110011
+// nop
+// nop
+// nop
 0062C3B3 // XOR X7,X5,X6 - 0110011
+// nop
+// nop
+// nop
 FD038393// addi x7,x7,-48
+// nop
+// nop
+// nop
 0071B433// SLTU X8,X3,X7 - 0110011
 0071A4B3// SLT X9, X3, X7 - 0110011
+// nop
+// nop
+// nop
 00939533// SLL X10, X7, X9 - 0110011
 0081D5B3// SRL X11, X3, X8 - 0110011
+// nop
+// nop
+// nop
 40B55633// SRA X12, X10, X11 - 0110011
-I TYPE INSTRUCTIONS
 00512693// SLTI X13, X2, 5 - 0010011
 00A23713// SLTIU X14, X4, 10 - 0010011
 00A2F793// ANDI X15, X5, 10 - 0010011
 00236813// ORI X16, X6, -2 - 0010011
 0143C893// XORI X17, X7, 20 - 0010011
+// nop
 00279913// SLLI X18, X15, 2 - 0010011
+// nop
+// nop
+// nop
 01095993// SRLI X19, X18, 16 - 0010011
-4028da13// SRAI X20, X17, 2 - 0010011
- // ADDI X1, X2, 5 - 0010011
+4028da13// SRAI X20, X1, 2 - 0010011
+
 
 /* 
  * TODO: Add testcases for all R-type instructions in 'BinaryFile' and check the expected results here
