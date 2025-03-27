@@ -43,7 +43,7 @@ class BTB extends Module {
 
 
   val fsm = Module(new FSM)
-  fsm.io.currentState := 0.U
+  fsm.io.currentState := 1.U
   fsm.io.mispredict := false.B
   when(io.update === 1.U) {                 // writing into buffer
     val updateIndex = io.updatePC(4, 2)
