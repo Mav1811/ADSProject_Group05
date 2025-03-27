@@ -16,10 +16,11 @@ class BTBTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.PC.poke("hABCD0000".U)
       dut.io.update.poke(0.U)  // No update initially
       dut.io.updatePC.poke(0.U)
-      dut.io.updateTarget.poke(0.U)
-      dut.io.mispredicted.poke(0.U)
+    //  dut.io.updateTarget.poke(0.U)
+    //  dut.io.mispredicted.poke(0.U)
 
       dut.clock.step(1)
+      dut.io.update.poke(0.U)
       dut.io.valid.expect(0.U)  // No valid entry yet
 
       // Write the first instruction
@@ -31,11 +32,12 @@ class BTBTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
 
       // Checking if the entry is valid and the target is correctly updated
+      dut.io.update.poke(0.U)
       dut.io.PC.poke("hABCD0000".U)
       dut.clock.step(1)
       dut.io.valid.expect(1.U)  // BTB entry should now be valid
       dut.io.target.expect(10.U)  // Target should be 10
-      dut.io.predictedTaken.expect(0.U)  // initial value is 01 - predict- taken is zero
+      dut.io.predictedTaken.expect(1.U)  // initial value is 01 - mispredicted - current state will be 10
 
       //----------- Test Case 2: Reading and writing at the same PC address
       dut.io.PC.poke("hABCF0000".U)
@@ -57,6 +59,7 @@ class BTBTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.valid.expect(1.U)
       dut.io.target.expect(30.U)
       dut.io.predictedTaken.expect(0.U)
+      dut.clock.step(1)
 
       // Test Case 3: Checking Replacement Logic in BTB
       dut.io.update.poke(1.U)  // Write a new entry at the same set
@@ -65,6 +68,7 @@ class BTBTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.mispredicted.poke(0.U)
 
       dut.clock.step(1)
+      dut.io.update.poke(0.U)
       dut.io.PC.poke("hABCD0000".U)  // This entry should be evicted
       dut.clock.step(1)
       dut.io.valid.expect(0.U)  // Entry for "hABCD0000" should no longer be valid
@@ -94,17 +98,21 @@ class BTBTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       dut.io.valid.expect(1.U)
       dut.io.target.expect("hCDEF0000".U)
-      dut.io.predictedTaken.expect(0.U)  // strongNotTaken initially
+      dut.io.predictedTaken.expect(0.U)  // strongNotTaken initially- 00
 
       // Step 1: First misprediction should move to weakNotTaken
       dut.io.mispredicted.poke(1.U)
       dut.clock.step(1)
-      dut.io.predictedTaken.expect(1.U)  // weakNotTaken (no change to taken)
+      dut.io.update.poke(0.U)
+      dut.io.predictedTaken.expect(0.U)  // weakNotTaken - 01
+      dut.clock.step(1)
 
       // Step 2: Second misprediction should move to strongTaken
+      dut.io.update.poke(1.U)
       dut.io.mispredicted.poke(1.U)
       dut.clock.step(1)
-      dut.io.predictedTaken.expect(1.U)  // strongTaken after second misprediction
+      dut.io.update.poke(0.U)
+      dut.io.predictedTaken.expect(1.U)  // current state -10- strong taken
 
       // Step 3: Verify final state after all transitions
       dut.io.PC.poke("hABCD0000".U)
@@ -113,7 +121,8 @@ class BTBTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.updateTarget.poke("hCDEF0000".U)
       dut.io.mispredicted.poke(1.U)
       dut.clock.step(1)
-      dut.io.predictedTaken.expect(0.U)  // Verify the FSM is in strongTaken state
+      dut.io.update.poke(0.U)
+      dut.io.predictedTaken.expect(1.U)  // Verify the FSM is in weakTaken state- current state 11
 
 
       //step 4: Verify the state transitions
@@ -124,8 +133,9 @@ class BTBTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       //
       dut.io.PC.poke(155.U)
+      dut.io.update.poke(0.U)
       dut.clock.step(1)
-      dut.io.predictedTaken.expect(0.U)
+      dut.io.predictedTaken.expect(1.U) // 10
       ///
       dut.io.updatePC.poke(155.U)
       dut.io.updateTarget.poke("hCDEF0000".U)
@@ -134,6 +144,7 @@ class BTBTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       ///
       dut.io.PC.poke(155.U)
+      dut.io.update.poke(0.U)
       dut.clock.step(1)
       dut.io.predictedTaken.expect(1.U)
       ///
@@ -144,6 +155,7 @@ class BTBTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       ////
       dut.io.PC.poke(155.U)
+      dut.io.update.poke(0.U)
       dut.clock.step(1)
       dut.io.predictedTaken.expect(0.U)
       ////
@@ -154,8 +166,10 @@ class BTBTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       ////
       dut.io.PC.poke(155.U)
+      dut.io.update.poke(0.U)
       dut.clock.step(1)
-      dut.io.predictedTaken.expect(1.U)
+      dut.io.predictedTaken.expect(0.U)
+
 
     }
   }

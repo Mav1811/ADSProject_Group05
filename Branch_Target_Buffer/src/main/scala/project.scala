@@ -76,21 +76,26 @@ class BTB extends Module {
   }
   val index = io.PC(4, 2) // Extract index bits (8 sets)
   val tag = io.PC(31, 5)  // Extract tag
+  val predictedout = Wire(UInt(2.W))
+  predictedout := 1.U
 
    when((io.update === 1.U) && io.PC === io.updatePC) {                      // forwarding when pc is same as update pc
       io.valid := io.update
       io.target := io.updateTarget
-      io.predictedTaken := fsm.io.nextState(1) // most significant bit representing prediction
-      lru(index) := 0.U
+     //predictedout := btb(index)(0).predictor
+     io.predictedTaken := fsm.io.nextState(1) // most significant bit representing prediction
+      //lru(index) := 0.U
     }.elsewhen((btb(index)(0).valid === 1.U) && btb(index)(0).tag === tag) {     // read in block(index)(0)
     io.valid := btb(index)(0).valid
     io.target := btb(index)(0).target
-    io.predictedTaken := btb(index)(0).predictor(1) // most significant bit representing prediction
+     predictedout := btb(index)(0).predictor
+    io.predictedTaken := predictedout(1)// most significant bit representing prediction
     lru(index) := 1.U
   }.elsewhen(btb(index)(1).valid.asBool && btb(index)(1).tag === tag) {      // read in block(index)(1)
     io.valid := btb(index)(1).valid
     io.target := btb(index)(1).target
-    io.predictedTaken := btb(index)(1).predictor(1) // most significant bit representing prediction
+     predictedout := btb(index)(1).predictor
+     io.predictedTaken := predictedout(1) // most significant bit representing prediction
     lru(index) := 0.U
   }.otherwise {                                                             // read value when there is no match in btb
     io.valid := 0.U
